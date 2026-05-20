@@ -175,9 +175,9 @@ static void startLockout(int idx) {
 }
 
 static void enterDeepSleep() {
-    Serial.printf("[SLEEP] Idle >%lus — deep sleep (wake on button)\n",
+    Serial.printf("[SLEEP] Idle >%lus — deep sleep (50ms poll)\n",
         SLEEP_AFTER_MS / 1000);
-    Serial.flush(); 
+    Serial.flush();
     allLedsOff();
     mqtt.disconnect();
     WiFi.disconnect(true);
