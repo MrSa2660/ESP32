@@ -178,11 +178,7 @@ static void startLockout(int idx) {
 }
 
 static void enterDeepSleep() {
-<<<<<<< Updated upstream
     Serial.printf("[SLEEP] Idle >%lus — deep sleep (50ms poll)\n",
-=======
-    Serial.printf("[SLEEP] Idle >%lus — deep sleep (polls buttons every 50ms)\n",
->>>>>>> Stashed changes
         SLEEP_AFTER_MS / 1000);
     Serial.flush();
     allLedsOff();
