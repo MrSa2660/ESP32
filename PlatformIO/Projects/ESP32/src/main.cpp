@@ -175,18 +175,13 @@ static void startLockout(int idx) {
 }
 
 static void enterDeepSleep() {
-    Serial.printf("[SLEEP] Idle >%lus — deep sleep (wake on button)\n",
+    Serial.printf("[SLEEP] Idle >%lus — deep sleep (50ms poll)\n",
         SLEEP_AFTER_MS / 1000);
-    Serial.flush(); 
+    Serial.flush();
     allLedsOff();
     mqtt.disconnect();
     WiFi.disconnect(true);
-
-    uint64_t wakeMask = 0;
-    for (int i = 0; i < 4; i++) {
-        wakeMask |= (1ULL << (int)BTN[i]);
-    }
-    esp_sleep_enable_ext1_wakeup(wakeMask, ESP_EXT1_WAKEUP_ANY_LOW);
+    esp_sleep_enable_timer_wakeup(50ULL * 1000ULL);
     esp_deep_sleep_start();
 }
 
