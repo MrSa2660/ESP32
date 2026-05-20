@@ -218,13 +218,8 @@ void setup() {
             }
         }
         if (pressed < 0) {
-<<<<<<< Updated upstream
             // no button still pressed, go back to sleep until one is
             enterDeepSleep();
-=======
-            esp_sleep_enable_timer_wakeup(50ULL * 1000ULL);
-            esp_deep_sleep_start();
->>>>>>> Stashed changes
         }
         Serial.printf("[WAKE] Button wake — button %d (%s) pressed\n",
             pressed, LABEL[pressed]);
