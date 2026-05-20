@@ -175,13 +175,18 @@ static void startLockout(int idx) {
 }
 
 static void enterDeepSleep() {
-    Serial.printf("[SLEEP] Idle >%lus — deep sleep (polls buttons every 500ms)\n",
+    Serial.printf("[SLEEP] Idle >%lus — deep sleep (wake on button)\n",
         SLEEP_AFTER_MS / 1000);
-    Serial.flush();
+    Serial.flush(); 
     allLedsOff();
     mqtt.disconnect();
     WiFi.disconnect(true);
-    esp_sleep_enable_timer_wakeup(500ULL * 1000ULL);
+
+    uint64_t wakeMask = 0;
+    for (int i = 0; i < 4; i++) {
+        wakeMask |= (1ULL << (int)BTN[i]);
+    }
+    esp_sleep_enable_ext1_wakeup(wakeMask, ESP_EXT1_WAKEUP_ANY_LOW);
     esp_deep_sleep_start();
 }
 
@@ -201,16 +206,20 @@ void setup() {
     }
 
     esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
-    if (cause == ESP_SLEEP_WAKEUP_TIMER) {
+    if (cause == ESP_SLEEP_WAKEUP_TIMER || cause == ESP_SLEEP_WAKEUP_EXT1) {
         int pressed = -1;
         for (int i = 0; i < 4; i++) {
-            if (digitalRead((int)BTN[i]) == LOW) { pressed = i; break; }
+            if (digitalRead((int)BTN[i]) == LOW) {
+                pressed = i;
+                break;
+            }
         }
         if (pressed < 0) {
-            esp_sleep_enable_timer_wakeup(500ULL * 1000ULL);
-            esp_deep_sleep_start();
+            // no button still pressed, go back to sleep until one is
+            enterDeepSleep();
         }
-        Serial.printf("[WAKE] Timer wake — button %d (%s) pressed\n", pressed, LABEL[pressed]);
+        Serial.printf("[WAKE] Button wake — button %d (%s) pressed\n",
+            pressed, LABEL[pressed]);
         digitalWrite(LED[pressed], HIGH);
         pendingPress = pressed;
         startLockout(pressed);
@@ -219,7 +228,7 @@ void setup() {
     }
 
     lastActivity = millis();
-    startWiFi();  // non-blocking — loop() handles the rest
+    startWiFi();
     Serial.println("[READY] Listening (network connecting in background)...");
 }
 
