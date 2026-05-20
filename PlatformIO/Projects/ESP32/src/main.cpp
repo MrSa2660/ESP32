@@ -186,7 +186,7 @@ static void enterDeepSleep() {
     for (int i = 0; i < 4; i++) {
         wakeMask |= (1ULL << (int)BTN[i]);
     }
-    esp_sleep_enable_ext1_wakeup(wakeMask, ESP_EXT1_WAKEUP_ANY_LOW);
+    esp_sleep_enable_ext1_wakeup(wakeMask, ESP_EXT1_WAKEUP_ALL_LOW);
     esp_deep_sleep_start();
 }
 
