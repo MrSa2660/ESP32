@@ -1,16 +1,16 @@
 #pragma once
 
 // ── WiFi ──────────────────────────────────────────────────────
-#define WIFI_SSID   "MrSa2660"
-#define WIFI_PASS   "salih2660"
+#define WIFI_SSID   "IoT_H3/4"
+#define WIFI_PASS   "98806829"
 
 // ── MQTT broker ───────────────────────────────────────────────
-#define MQTT_HOST   "192.168.0.161"
+#define MQTT_HOST   "wilsons.local"
 #define MQTT_PORT   8883
-#define MQTT_USER   "user1"
-#define MQTT_PASS   "YOUR_MQTT_PASSWORD"
-#define MQTT_TOPIC  "iot/del2/league/feedback"
-#define DEVICE_ID   "ESP32-Smiley"
+#define MQTT_USER   "device06"
+#define MQTT_PASS   "V2575avv"
+#define MQTT_TOPIC  "/devices/device06"
+#define DEVICE_ID   "device06"
 
 // ── CA certificate (PEM, from wilson.local) ───────────────────
 // Must be a variable, not a #define — raw string literals don't work in macros.
