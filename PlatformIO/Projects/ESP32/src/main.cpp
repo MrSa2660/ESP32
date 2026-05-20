@@ -5,7 +5,7 @@
 #include <time.h>
 #include "config.h"
 
-#define MQTT_ENABLED false   // set to true to re-enable
+#define MQTT_ENABLED true
 
 // ── Pin mapping ───────────────────────────────────────────────
 //   BTN[0] very-happy   GPIO 13   LED[0] GPIO 25
@@ -82,7 +82,7 @@ static void startMQTT() {
         if (pendingPress >= 0) { publishPress(pendingPress); pendingPress = -1; }
         return;
     }
-    net.setCACert(CA_CERT);
+    net.setInsecure();
     mqtt.setServer(MQTT_HOST, MQTT_PORT);
     Serial.printf("[MQTT] Connecting to %s:%d...\n", MQTT_HOST, MQTT_PORT);
     netState      = MQTT_CONNECTING;
@@ -146,22 +146,25 @@ static void updateNetwork() {
 
 // ── Press / lockout ───────────────────────────────────────────
 static void publishPress(int idx) {
+    char topic[80];
+    snprintf(topic, sizeof(topic), "%s/%s", MQTT_TOPIC, LABEL[idx]);
+
     char payload[160];
     snprintf(payload, sizeof(payload),
-        "{\"timestamp\":\"%s\",\"button\":\"%s\",\"device\":\"%s\"}",
-        getTimestamp().c_str(), LABEL[idx], DEVICE_ID);
+        "{\"timestamp\":\"%s\",\"device\":\"%s\"}",
+        getTimestamp().c_str(), DEVICE_ID);
 
     if (!MQTT_ENABLED) {
-        Serial.printf("[MQTT] (disabled) would publish: %s\n", payload);
+        Serial.printf("[MQTT] (disabled) would publish to %s: %s\n", topic, payload);
         return;
     }
     if (netState != NET_READY || !mqtt.connected()) {
-        Serial.printf("[MQTT] Not ready — queued: %s\n", payload);
+        Serial.printf("[MQTT] Not ready — queued: %s\n", topic);
         pendingPress = idx;
         return;
     }
-    bool ok = mqtt.publish(MQTT_TOPIC, payload, true);
-    Serial.printf("[MQTT] Publish %s  %s\n", ok ? "OK" : "FAILED", payload);
+    bool ok = mqtt.publish(topic, payload);
+    Serial.printf("[MQTT] Publish %s  %s  %s\n", ok ? "OK" : "FAILED", topic, payload);
 }
 
 static void startLockout(int idx) {
@@ -175,7 +178,11 @@ static void startLockout(int idx) {
 }
 
 static void enterDeepSleep() {
+<<<<<<< Updated upstream
     Serial.printf("[SLEEP] Idle >%lus — deep sleep (50ms poll)\n",
+=======
+    Serial.printf("[SLEEP] Idle >%lus — deep sleep (polls buttons every 50ms)\n",
+>>>>>>> Stashed changes
         SLEEP_AFTER_MS / 1000);
     Serial.flush();
     allLedsOff();
@@ -215,8 +222,13 @@ void setup() {
             }
         }
         if (pressed < 0) {
+<<<<<<< Updated upstream
             // no button still pressed, go back to sleep until one is
             enterDeepSleep();
+=======
+            esp_sleep_enable_timer_wakeup(50ULL * 1000ULL);
+            esp_deep_sleep_start();
+>>>>>>> Stashed changes
         }
         Serial.printf("[WAKE] Button wake — button %d (%s) pressed\n",
             pressed, LABEL[pressed]);
