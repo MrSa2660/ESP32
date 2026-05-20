@@ -178,7 +178,11 @@ static void startLockout(int idx) {
 }
 
 static void enterDeepSleep() {
+<<<<<<< Updated upstream
     Serial.printf("[SLEEP] Idle >%lus — deep sleep (50ms poll)\n",
+=======
+    Serial.printf("[SLEEP] Idle >%lus — deep sleep (polls buttons every 50ms)\n",
+>>>>>>> Stashed changes
         SLEEP_AFTER_MS / 1000);
     Serial.flush();
     allLedsOff();
@@ -213,8 +217,13 @@ void setup() {
             }
         }
         if (pressed < 0) {
+<<<<<<< Updated upstream
             // no button still pressed, go back to sleep until one is
             enterDeepSleep();
+=======
+            esp_sleep_enable_timer_wakeup(50ULL * 1000ULL);
+            esp_deep_sleep_start();
+>>>>>>> Stashed changes
         }
         Serial.printf("[WAKE] Button wake — button %d (%s) pressed\n",
             pressed, LABEL[pressed]);
