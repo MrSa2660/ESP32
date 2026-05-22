@@ -5,8 +5,6 @@
 #include <time.h>
 #include "config.h"
 
-#define MQTT_ENABLED true
-
 // ── Pin mapping ───────────────────────────────────────────────
 //   BTN[0] very-happy   GPIO 13   LED[0] GPIO 25
 //   BTN[1] happy        GPIO 27   LED[1] GPIO 26
@@ -17,8 +15,8 @@ const int        LED[4] = {25, 26, 22, 23};
 const char*    LABEL[4] = {"very_happy", "happy", "unhappy", "very_unhappy"};
 
 // ── Timing ────────────────────────────────────────────────────
-const unsigned long DEBOUNCE_MS    = 50;
-const unsigned long LOCKOUT_MS     = 7000;
+const unsigned long DEBOUNCE_MS    = 10;
+const unsigned long LOCKOUT_MS     = 4000;
 const unsigned long SLEEP_AFTER_MS = 10000;
 
 // ── Button state ──────────────────────────────────────────────
@@ -33,7 +31,7 @@ static unsigned long lastActivity = 0;
 enum NetState { WIFI_CONNECTING, NTP_SYNCING, MQTT_CONNECTING, NET_READY };
 static NetState      netState      = WIFI_CONNECTING;
 static unsigned long netStateStart = 0;
-static int           pendingPress  = -1;  // press queued before MQTT was ready
+static int           pendingPress  = -1;
 
 static WiFiClientSecure net;
 static PubSubClient     mqtt(net);
@@ -51,9 +49,9 @@ static String getTimestamp() {
     return String(buf);
 }
 
-static void publishPress(int idx);  // forward declaration
+static void publishPress(int idx);
 
-// ── Async network ─────────────────────────────────────────────
+// ── Network ───────────────────────────────────────────────────
 static void startWiFi() {
     Serial.printf("[WiFi] Connecting to %s...\n", WIFI_SSID);
     WiFi.mode(WIFI_STA);
@@ -76,12 +74,6 @@ static void startNTP() {
 }
 
 static void startMQTT() {
-    if (!MQTT_ENABLED) {
-        Serial.println("[MQTT] Disabled — skipping");
-        netState = NET_READY;
-        if (pendingPress >= 0) { publishPress(pendingPress); pendingPress = -1; }
-        return;
-    }
     net.setInsecure();
     mqtt.setServer(MQTT_HOST, MQTT_PORT);
     Serial.printf("[MQTT] Connecting to %s:%d...\n", MQTT_HOST, MQTT_PORT);
@@ -132,13 +124,11 @@ static void updateNetwork() {
             break;
 
         case NET_READY:
-            if (MQTT_ENABLED) {
-                mqtt.loop();
-                if (!mqtt.connected() && WiFi.status() == WL_CONNECTED) {
-                    Serial.println("[MQTT] Lost connection — reconnecting...");
-                    netState      = MQTT_CONNECTING;
-                    netStateStart = millis();
-                }
+            mqtt.loop();
+            if (!mqtt.connected() && WiFi.status() == WL_CONNECTED) {
+                Serial.println("[MQTT] Lost connection — reconnecting...");
+                netState      = MQTT_CONNECTING;
+                netStateStart = millis();
             }
             break;
     }
@@ -154,10 +144,6 @@ static void publishPress(int idx) {
         "{\"timestamp\":\"%s\",\"device\":\"%s\"}",
         getTimestamp().c_str(), DEVICE_ID);
 
-    if (!MQTT_ENABLED) {
-        Serial.printf("[MQTT] (disabled) would publish to %s: %s\n", topic, payload);
-        return;
-    }
     if (netState != NET_READY || !mqtt.connected()) {
         Serial.printf("[MQTT] Not ready — queued: %s\n", topic);
         pendingPress = idx;
@@ -178,14 +164,12 @@ static void startLockout(int idx) {
 }
 
 static void enterDeepSleep() {
-    Serial.printf("[SLEEP] Idle >%lus — deep sleep (50ms poll)\n",
-        SLEEP_AFTER_MS / 1000);
     Serial.flush();
     allLedsOff();
     mqtt.disconnect();
     WiFi.disconnect(true);
 
-    esp_sleep_enable_timer_wakeup(50000ULL); // 50 ms poll — any button LOW resumes boot
+    esp_sleep_enable_timer_wakeup(50000ULL);
     esp_deep_sleep_start();
 }
 
@@ -214,7 +198,6 @@ void setup() {
             }
         }
         if (pressed < 0) {
-            // no button still pressed, go back to sleep until one is
             enterDeepSleep();
         }
         Serial.printf("[WAKE] Button wake — button %d (%s) pressed\n",
@@ -237,14 +220,12 @@ void loop() {
 
     unsigned long now = millis();
 
-    // Lockout expiry
     if (lockedBtn >= 0 && now - lockStart >= LOCKOUT_MS) {
         Serial.printf("[BTN]  Lockout expired — %s ready again\n", LABEL[lockedBtn]);
         allLedsOff();
         lockedBtn = -1;
     }
 
-    // Raw pin dump every 1s
     static unsigned long lastDump = 0;
     if (now - lastDump >= 1000) {
         lastDump = now;
@@ -253,7 +234,6 @@ void loop() {
             digitalRead(32), digitalRead(33), netState, lockedBtn);
     }
 
-    // Button polling — skip while locked out
     if (lockedBtn < 0) {
         for (int i = 0; i < 4; i++) {
             int reading = digitalRead((int)BTN[i]);
@@ -270,7 +250,6 @@ void loop() {
         }
     }
 
-    // Idle → deep sleep
     if (lockedBtn < 0 && now - lastActivity >= SLEEP_AFTER_MS) {
         enterDeepSleep();
     }
