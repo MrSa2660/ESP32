@@ -19,7 +19,7 @@ const char*    LABEL[4] = {"very_happy", "happy", "unhappy", "very_unhappy"};
 // ── Timing ────────────────────────────────────────────────────
 const unsigned long DEBOUNCE_MS    = 50;
 const unsigned long LOCKOUT_MS     = 7000;
-const unsigned long SLEEP_AFTER_MS = 30000;
+const unsigned long SLEEP_AFTER_MS = 10000;
 
 // ── Button state ──────────────────────────────────────────────
 static int           lastReading[4];
@@ -185,11 +185,7 @@ static void enterDeepSleep() {
     mqtt.disconnect();
     WiFi.disconnect(true);
 
-    uint64_t wakeMask = 0;
-    for (int i = 0; i < 4; i++) {
-        wakeMask |= (1ULL << (int)BTN[i]);
-    }
-    esp_sleep_enable_ext1_wakeup(wakeMask, ESP_EXT1_WAKEUP_ALL_LOW);
+    esp_sleep_enable_timer_wakeup(50000ULL); // 50 ms poll — any button LOW resumes boot
     esp_deep_sleep_start();
 }
 
