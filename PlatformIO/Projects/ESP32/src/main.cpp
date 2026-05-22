@@ -190,7 +190,7 @@ static void enterDeepSleep() {
     uint64_t wakeupMask = (1ULL << (int)BTN[0]) | (1ULL << (int)BTN[1]) |
                           (1ULL << (int)BTN[2]) | (1ULL << (int)BTN[3]);
     esp_sleep_enable_ext1_wakeup(wakeupMask, ESP_EXT1_WAKEUP_ANY_HIGH);
-
+    Serial.println("[Sleep] Deepsleep start....");
     Serial.flush();
     esp_deep_sleep_start();
 }
