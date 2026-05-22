@@ -2,6 +2,8 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
+#include <driver/rtc_io.h>
+#include <esp_sleep.h>
 #include <time.h>
 #include "config.h"
 
@@ -164,12 +166,32 @@ static void startLockout(int idx) {
 }
 
 static void enterDeepSleep() {
-    Serial.flush();
     allLedsOff();
+
+    // Wait for all buttons to be released so the device does not instantly wake.
+    bool anyHeld = true;
+    while (anyHeld) {
+        anyHeld = false;
+        for (int i = 0; i < 4; i++)
+            if (digitalRead((int)BTN[i]) == HIGH) { anyHeld = true; break; }
+        if (anyHeld) delay(50);
+    }
+
     mqtt.disconnect();
     WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
 
-    esp_sleep_enable_timer_wakeup(50000ULL);
+    // EXT1 uses RTC GPIO settings while the ESP is asleep.
+    for (int i = 0; i < 4; i++) {
+        rtc_gpio_pullup_dis(BTN[i]);
+        rtc_gpio_pulldown_en(BTN[i]);
+    }
+
+    uint64_t wakeupMask = (1ULL << (int)BTN[0]) | (1ULL << (int)BTN[1]) |
+                          (1ULL << (int)BTN[2]) | (1ULL << (int)BTN[3]);
+    esp_sleep_enable_ext1_wakeup(wakeupMask, ESP_EXT1_WAKEUP_ANY_HIGH);
+
+    Serial.flush();
     esp_deep_sleep_start();
 }
 
@@ -179,29 +201,36 @@ void setup() {
     delay(200);
     Serial.println("\n========== Smiley Panel boot ==========");
 
+    // After deep sleep, RTC pins must be returned to normal GPIO.
+    for (int i = 0; i < 4; i++)
+        rtc_gpio_deinit(BTN[i]);
+
     for (int i = 0; i < 4; i++) {
-        pinMode((int)BTN[i], INPUT_PULLUP);
+        pinMode((int)BTN[i], INPUT_PULLDOWN);
         pinMode(LED[i], OUTPUT);
         digitalWrite(LED[i], LOW);
-        lastReading[i]  = HIGH;
-        btnState[i]     = HIGH;
+        lastReading[i]  = LOW;
+        btnState[i]     = LOW;
         lastDebounce[i] = 0;
     }
 
     esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
-    if (cause == ESP_SLEEP_WAKEUP_TIMER || cause == ESP_SLEEP_WAKEUP_EXT1) {
+    if (cause == ESP_SLEEP_WAKEUP_EXT1) {
+        // Use wakeup status register to identify which button fired.
+        uint64_t status = esp_sleep_get_ext1_wakeup_status();
         int pressed = -1;
         for (int i = 0; i < 4; i++) {
-            if (digitalRead((int)BTN[i]) == LOW) {
-                pressed = i;
-                break;
+            if (status & (1ULL << (int)BTN[i])) { pressed = i; break; }
+        }
+        if (pressed < 0) {
+            for (int i = 0; i < 4; i++) {
+                if (digitalRead((int)BTN[i]) == HIGH) { pressed = i; break; }
             }
         }
         if (pressed < 0) {
             enterDeepSleep();
         }
-        Serial.printf("[WAKE] Button wake — button %d (%s) pressed\n",
-            pressed, LABEL[pressed]);
+        Serial.printf("[WAKE] Button wake — %s\n", LABEL[pressed]);
         digitalWrite(LED[pressed], HIGH);
         pendingPress = pressed;
         startLockout(pressed);
@@ -226,21 +255,13 @@ void loop() {
         lockedBtn = -1;
     }
 
-    static unsigned long lastDump = 0;
-    if (now - lastDump >= 1000) {
-        lastDump = now;
-        Serial.printf("[GPIO] 13=%d 27=%d 32=%d 33=%d  net=%d  locked=%d\n",
-            digitalRead(13), digitalRead(27),
-            digitalRead(32), digitalRead(33), netState, lockedBtn);
-    }
-
     if (lockedBtn < 0) {
         for (int i = 0; i < 4; i++) {
             int reading = digitalRead((int)BTN[i]);
             if (reading != lastReading[i]) lastDebounce[i] = now;
             if (now - lastDebounce[i] > DEBOUNCE_MS && reading != btnState[i]) {
                 btnState[i] = reading;
-                if (btnState[i] == LOW) {
+                if (btnState[i] == HIGH) {
                     Serial.printf("[BTN]  Pressed: %s (GPIO %d)\n", LABEL[i], (int)BTN[i]);
                     publishPress(i);
                     startLockout(i);

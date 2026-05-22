@@ -8,8 +8,8 @@
 #define MQTT_HOST   "wilsons.local"
 #define MQTT_IP     "192.168.0.161"
 #define MQTT_PORT   8883
-#define MQTT_USER   "user12"
-#define MQTT_PASS   "BgfmkeFX"
+#define MQTT_USER   "device06"
+#define MQTT_PASS   "V2575avv"
 #define MQTT_TOPIC  "/devices/device06"
 #define DEVICE_ID   "device06"
 
